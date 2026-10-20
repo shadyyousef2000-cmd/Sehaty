@@ -1,1 +1,55 @@
 
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Sehaty
+        run: unzip -q sehaty.zip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        working-directory: sehaty
+        run: npm install
+
+      - name: Prepare Android
+        working-directory: sehaty
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Enable notifications
+        working-directory: sehaty
+        run: |
+          f=android/app/src/main/AndroidManifest.xml
+          grep -q POST_NOTIFICATIONS "$f" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n</manifest>#' "$f"
+
+      - name: Build APK
+        working-directory: sehaty/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sehaty-apk
+          path: sehaty/android/app/build/outputs/apk/debug/app-debug.apk
+
